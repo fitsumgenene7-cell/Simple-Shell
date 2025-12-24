@@ -1,13 +1,11 @@
 #include "../include/shell.h"
 #include <stdbool.h>
 
-/* Check if character is an operator */
 static bool is_operator_char(char c)
 {
     return (c == ';' || c == '&' || c == '|' || c == '>' || c == '#');
 }
 
-/* Skip whitespace */
 static char *skip_whitespace(char *str)
 {
     while (*str && isspace((unsigned char)*str)) {
@@ -28,7 +26,6 @@ static operator_t get_operator(char *str)
     return OP_NONE;
 }
 
-/* Parse a single command */
 static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
 {
     (void)state; /* Unused for now */
@@ -117,7 +114,6 @@ static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
     return cmd;
 }
 
-/* Find next operator in string */
 static operator_t find_next_operator(char *str, int *op_len)
 {
     char *pos = skip_whitespace(str);
@@ -152,11 +148,9 @@ command_t *parse_command(char *input, shell_state_t *state)
     char *pos = input;
     
     while (*pos && *pos != '#') {
-        /* Skip leading whitespace */
         pos = skip_whitespace(pos);
         if (!*pos || *pos == '#') break;
         
-        /* Parse a single command */
         command_t *cmd = parse_single_command(&pos, state);
         if (!cmd) continue;
         
@@ -183,7 +177,6 @@ command_t *parse_command(char *input, shell_state_t *state)
     return head;
 }
 
-/* Free command structure */
 void free_command(command_t *cmd)
 {
     if (!cmd) return;

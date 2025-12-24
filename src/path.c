@@ -11,7 +11,6 @@ void init_path(shell_state_t *state)
     state->path_dirs[0] = my_strdup("/bin");
 }
 
-/* Find command in PATH */
 char *find_command_in_path(char *cmd, shell_state_t *state)
 {
     /* Check if command contains a slash (absolute or relative path) */
