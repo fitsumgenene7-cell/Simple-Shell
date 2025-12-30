@@ -1,3 +1,4 @@
+
 # 🐚 OShell - A Simplified Unix Command-Line Interpreter
 
 **OShell** is a lightweight Unix-like shell implementation written in C, designed to demonstrate core operating system concepts including process management, command parsing, file I/O, and environment management. It replicates essential functionality from shells like `bash` while maintaining simplicity and educational clarity.
@@ -108,4 +109,4 @@ oshell-project/
 cd oshell-project/
 
 # Compile the shell
-make
+make# Simple-Shell
