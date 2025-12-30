@@ -105,6 +105,19 @@ void free_string_array(char **array);
 char *trim_whitespace(char *str);
 char *my_strdup(const char *s);
 
+/* Utility functions */
+void print_error(void);
+char **split_string(char *str, const char *delim, int *count);
+void free_string_array(char **array);
+char *trim_whitespace(char *str);
+char *my_strdup(const char *s);
+
+/* Variable expansion */
+char *expand_variables(char *arg, shell_state_t *state);  // ADD THIS LINE
+
+/* Signal handling */
+void setup_signals(void);
+
 /* Signal handling */
 void setup_signals(void);
 

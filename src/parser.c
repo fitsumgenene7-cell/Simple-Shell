@@ -1,5 +1,6 @@
 #include "../include/shell.h"
 #include <stdbool.h>
+#include <ctype.h>
 
 static bool is_operator_char(char c)
 {
@@ -14,7 +15,6 @@ static char *skip_whitespace(char *str)
     return str;
 }
 
-
 /* Get operator type from string */
 static operator_t get_operator(char *str)
 {
@@ -28,20 +28,25 @@ static operator_t get_operator(char *str)
 
 static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
 {
-    (void)state; /* Unused for now */
-    
     char *pos = *input_ptr;
     command_t *cmd = malloc(sizeof(command_t));
-    if (!cmd) return NULL;
+    if (!cmd) {
+        print_error();
+        return NULL;
+    }
     
     memset(cmd, 0, sizeof(command_t));
     cmd->args = malloc(MAX_ARGS * sizeof(char *));
     if (!cmd->args) {
         free(cmd);
+        print_error();
         return NULL;
     }
     
     int arg_count = 0;
+    bool in_quotes = false;
+    char quote_char = 0;
+    bool in_double_quotes = false;
     
     while (*pos && *pos != '#') {
         pos = skip_whitespace(pos);
@@ -63,8 +68,20 @@ static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
             if (pos > start) {
                 size_t len = pos - start;
                 cmd->output_file = malloc(len + 1);
+                if (!cmd->output_file) {
+                    print_error();
+                    free_command(cmd);
+                    return NULL;
+                }
                 strncpy(cmd->output_file, start, len);
                 cmd->output_file[len] = '\0';
+                
+                /* Expand variables in output filename */
+                char *expanded_file = expand_variables(cmd->output_file, state);
+                if (expanded_file) {
+                    free(cmd->output_file);
+                    cmd->output_file = expanded_file;
+                }
             } else {
                 print_error();
                 free_command(cmd);
@@ -78,7 +95,7 @@ static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
             if (isspace((unsigned char)next_char) || !next_char || is_operator_char(next_char)) {
                 cmd->background = 1;
                 pos++;
-                continue;
+                break; /* Background operator ends the command */
             }
             /* If not, fall through to treat as part of argument */
         }
@@ -87,29 +104,102 @@ static command_t *parse_single_command(char **input_ptr, shell_state_t *state)
             break;
         }
         
-        /* Extract regular argument */
-        char *start = pos;
-        while (*pos && !isspace((unsigned char)*pos) && !is_operator_char(*pos)) {
-            pos++;
+        /* Handle quotes */
+        if (!in_quotes && (*pos == '"' || *pos == '\'')) {
+            in_quotes = true;
+            quote_char = *pos;
+            in_double_quotes = (*pos == '"');
+            pos++; /* Skip opening quote */
         }
         
-        if (pos > start) {
-            size_t len = pos - start;
-            if (arg_count >= MAX_ARGS - 1) {
-                free_command(cmd);
-                print_error();
-                return NULL;
+        char *start = pos;
+        
+        if (in_quotes) {
+            /* Parse quoted string */
+            while (*pos && *pos != quote_char) {
+                pos++;
             }
             
-            cmd->args[arg_count] = malloc(len + 1);
-            strncpy(cmd->args[arg_count], start, len);
-            cmd->args[arg_count][len] = '\0';
-            arg_count++;
+            if (*pos == quote_char) {
+                size_t len = pos - start;
+                if (arg_count >= MAX_ARGS - 1) {
+                    free_command(cmd);
+                    print_error();
+                    return NULL;
+                }
+                
+                cmd->args[arg_count] = malloc(len + 1);
+                if (!cmd->args[arg_count]) {
+                    print_error();
+                    free_command(cmd);
+                    return NULL;
+                }
+                strncpy(cmd->args[arg_count], start, len);
+                cmd->args[arg_count][len] = '\0';
+                
+                /* Expand variables only in double quotes */
+                if (in_double_quotes) {
+                    char *expanded = expand_variables(cmd->args[arg_count], state);
+                    if (expanded) {
+                        free(cmd->args[arg_count]);
+                        cmd->args[arg_count] = expanded;
+                    }
+                }
+                
+                arg_count++;
+                pos++; /* Skip closing quote */
+                in_quotes = false;
+                in_double_quotes = false;
+                quote_char = 0;
+            } else {
+                /* Unclosed quote - error */
+                print_error();
+                free_command(cmd);
+                return NULL;
+            }
+        } else {
+            /* Parse regular argument */
+            while (*pos && !isspace((unsigned char)*pos) && !is_operator_char(*pos)) {
+                pos++;
+            }
+            
+            if (pos > start) {
+                size_t len = pos - start;
+                if (arg_count >= MAX_ARGS - 1) {
+                    free_command(cmd);
+                    print_error();
+                    return NULL;
+                }
+                
+                cmd->args[arg_count] = malloc(len + 1);
+                if (!cmd->args[arg_count]) {
+                    print_error();
+                    free_command(cmd);
+                    return NULL;
+                }
+                strncpy(cmd->args[arg_count], start, len);
+                cmd->args[arg_count][len] = '\0';
+                
+                /* Expand variables in the argument */
+                char *expanded = expand_variables(cmd->args[arg_count], state);
+                if (expanded) {
+                    free(cmd->args[arg_count]);
+                    cmd->args[arg_count] = expanded;
+                }
+                
+                arg_count++;
+            }
         }
     }
     
     cmd->args[arg_count] = NULL;
     *input_ptr = pos;
+    
+    /* Check if we parsed anything */
+    if (arg_count == 0 && !cmd->output_file && !cmd->background) {
+        free_command(cmd);
+        return NULL;
+    }
     
     return cmd;
 }
@@ -143,6 +233,8 @@ static operator_t find_next_operator(char *str, int *op_len)
 /* Main parsing function */
 command_t *parse_command(char *input, shell_state_t *state)
 {
+    if (!input || !*input) return NULL;
+    
     command_t *head = NULL;
     command_t *tail = NULL;
     char *pos = input;
@@ -152,7 +244,13 @@ command_t *parse_command(char *input, shell_state_t *state)
         if (!*pos || *pos == '#') break;
         
         command_t *cmd = parse_single_command(&pos, state);
-        if (!cmd) continue;
+        if (!cmd) {
+            /* If parsing failed, skip to next operator or end */
+            while (*pos && !is_operator_char(*pos)) {
+                pos++;
+            }
+            continue;
+        }
         
         /* Find operator to next command */
         int op_len;
@@ -172,6 +270,11 @@ command_t *parse_command(char *input, shell_state_t *state)
             tail->next = cmd;
             tail = cmd;
         }
+        
+        /* Check for background - it should end command chain */
+        if (cmd->background) {
+            break;
+        }
     }
     
     return head;
@@ -183,7 +286,7 @@ void free_command(command_t *cmd)
     
     /* Free arguments */
     if (cmd->args) {
-        for (int i = 0; cmd->args[i]; i++) {
+        for (int i = 0; cmd->args[i] != NULL; i++) {
             free(cmd->args[i]);
         }
         free(cmd->args);
@@ -192,6 +295,11 @@ void free_command(command_t *cmd)
     /* Free output file */
     if (cmd->output_file) {
         free(cmd->output_file);
+    }
+    
+    /* Recursively free next commands */
+    if (cmd->next) {
+        free_command(cmd->next);
     }
     
     /* Free the command itself */

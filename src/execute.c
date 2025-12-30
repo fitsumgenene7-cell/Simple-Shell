@@ -3,59 +3,11 @@
 /* Check if command is built-in */
 int is_builtin(char *cmd)
 {
-        if (cmd == NULL) return 0;
-        return (strcmp(cmd, "exit") == 0 || strcmp(cmd, "cd") == 0 ||
-            strcmp(cmd, "env") == 0 || strcmp(cmd, "setenv") == 0 ||
-            strcmp(cmd, "unsetenv") == 0 || strcmp(cmd, "alias") == 0 ||
-            strcmp(cmd, "path") == 0);
-}
-
-/* Execute built-in command */
-int execute_builtin(command_t *cmd, shell_state_t *state)
-{
-    if (strcmp(cmd->args[0], "exit") == 0) {
-        state->exit_requested = 1;
-        if (cmd->args[1] != NULL) {
-            state->exit_status = atoi(cmd->args[1]);
-        }
-        return state->exit_status;
-    } else if (strcmp(cmd->args[0], "cd") == 0) {
-        char *target = cmd->args[1];
-        if (target == NULL || strcmp(target, "~") == 0) {
-            target = state->home;
-        } else if (strcmp(target, "-") == 0) {
-            target = state->oldpwd;
-        }
-        
-        if (chdir(target) != 0) {
-            print_error();
-            return 1;
-        }
-        
-        free(state->oldpwd);
-        state->oldpwd = my_strdup(state->cwd);
-        free(state->cwd);
-        state->cwd = getcwd(NULL, 0);
-        return 0;
-    } else if (strcmp(cmd->args[0], "env") == 0) {
-        /* For now, print a placeholder */
-        printf("env: Prints environment variables\n");
-        return 0;
-    } else if (strcmp(cmd->args[0], "setenv") == 0) {
-        printf("setenv: Sets environment variable\n");
-        return 0;
-    } else if (strcmp(cmd->args[0], "unsetenv") == 0) {
-        printf("unsetenv: Unsets environment variable\n");
-        return 0;
-    } else if (strcmp(cmd->args[0], "alias") == 0) {
-        printf("alias: Manages aliases\n");
-        return 0;
-    } else if (strcmp(cmd->args[0], "path") == 0) {
-        printf("path: Sets PATH\n");
-        return 0;
-    }
-    
-    return 1;
+    if (cmd == NULL) return 0;
+    return (strcmp(cmd, "exit") == 0 || strcmp(cmd, "cd") == 0 ||
+        strcmp(cmd, "env") == 0 || strcmp(cmd, "setenv") == 0 ||
+        strcmp(cmd, "unsetenv") == 0 || strcmp(cmd, "alias") == 0 ||
+        strcmp(cmd, "path") == 0);
 }
 
 /* Setup redirection */
@@ -128,16 +80,19 @@ int execute_external(command_t *cmd, shell_state_t *state)
         free(cmd_path);
         
         if (cmd->background) {
-            /* Background process */
+            /* Background process - don't wait */
             printf("[%d]\n", pid);
+            state->last_exit_status = 0;
             return 0;
         } else {
             /* Wait for foreground process */
             waitpid(pid, &status, 0);
             
             if (WIFEXITED(status)) {
-                return WEXITSTATUS(status);
+                state->last_exit_status = WEXITSTATUS(status);
+                return state->last_exit_status;
             } else {
+                state->last_exit_status = 1;
                 return 1;
             }
         }
@@ -146,16 +101,94 @@ int execute_external(command_t *cmd, shell_state_t *state)
     return 0;
 }
 
+/* Execute built-in command */
+int execute_builtin(command_t *cmd, shell_state_t *state)
+{
+    int result;
+    
+    if (strcmp(cmd->args[0], "exit") == 0) {
+        result = builtin_exit(cmd, state);
+    } else if (strcmp(cmd->args[0], "cd") == 0) {
+        result = builtin_cd(cmd, state);
+    } else if (strcmp(cmd->args[0], "env") == 0) {
+        result = builtin_env(cmd, state);
+    } else if (strcmp(cmd->args[0], "setenv") == 0) {
+        result = builtin_setenv(cmd, state);
+    } else if (strcmp(cmd->args[0], "unsetenv") == 0) {
+        result = builtin_unsetenv(cmd, state);
+    } else if (strcmp(cmd->args[0], "alias") == 0) {
+        result = builtin_alias(cmd, state);
+    } else if (strcmp(cmd->args[0], "path") == 0) {
+        result = builtin_path(cmd, state);
+    } else {
+        result = 1;
+    }
+    
+    state->last_exit_status = result;
+    return result;
+}
+
+/* Execute command chain */
+/* Execute command chain */
+static int execute_chain(command_t *cmd, shell_state_t *state)
+{
+    command_t *current = cmd;
+    int result = 0;
+    
+    while (current != NULL && !state->exit_requested) {
+        if (current->args[0] == NULL) {
+            /* Empty command */
+            result = 0;
+        } else if (is_builtin(current->args[0])) {
+            result = execute_builtin(current, state);
+        } else {
+            result = execute_external(current, state);
+        }
+        
+        /* If current command is background, return immediately */
+        if (current->background) {
+            return result;  /* Don't wait for next commands */
+        }
+        
+        /* Handle operators */
+        switch (current->next_op) {
+            case OP_SEQUENCE:
+                /* Always execute next command */
+                break;
+                
+            case OP_AND:
+                /* Execute next only if current succeeded */
+                if (result != 0) {
+                    return result; /* Skip rest of chain */
+                }
+                break;
+                
+            case OP_OR:
+                /* Execute next only if current failed */
+                if (result == 0) {
+                    return result; /* Skip rest of chain */
+                }
+                break;
+                
+            case OP_BACKGROUND:
+            case OP_REDIRECT:
+            case OP_NONE:
+                /* Normal termination */
+                return result;
+        }
+        
+        current = current->next;
+    }
+    
+    return result;
+}
 /* Main execution function */
 int execute_command(command_t *cmd, shell_state_t *state)
 {
     if (cmd == NULL || cmd->args[0] == NULL) {
+        state->last_exit_status = 0;
         return 0;
     }
     
-    if (is_builtin(cmd->args[0])) {
-        return execute_builtin(cmd, state);
-    } else {
-        return execute_external(cmd, state);
-    }
+    return execute_chain(cmd, state);
 }
