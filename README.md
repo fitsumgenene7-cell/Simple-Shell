@@ -42,41 +42,41 @@
 
 ## 📁 Project Structure
 oshell-project/
-├── Makefile                    # Build configuration
-├── README.md                   # This documentation
-├── include/                    # Header files
-│   ├── shell.h                # Main shell structures
-│   ├── parser.h               # Parsing functions
-│   ├── execute.h              # Execution functions
-│   ├── builtins.h             # Built-in commands
-│   ├── expand.h               # Variable expansion
-│   ├── path.h                 # PATH management
-│   ├── error.h                # Error handling
-│   ├── utils.h                # Utilities
-│   └── signals.h              # Signal handling
-├── src/                       # Source code
-│   ├── main.c                 # Entry point
-│   ├── shell.c                # Main shell loop
-│   ├── parser.c               # Command parsing
-│   ├── execute.c              # Command execution
-│   ├── builtins.c             # Built-in implementations
-│   ├── expand.c               # Variable expansion
-│   ├── path.c                 # PATH resolution
-│   ├── error.c                # Error handling
-│   ├── utils.c                # Utility functions
-│   └── signals.c              # Signal handlers
-├── man/                       # Manual pages
-│   ├── exit.1
-│   ├── cd.1
-│   ├── env.1
-│   ├── setenv.1
-│   ├── unsetenv.1
-│   ├── alias.1
-│   └── path.1
-└── tests/                     # Test files
-    ├── test_commands.txt
-    ├── test_batch.txt
-    └── test_parser.txt
+├── Makefile # Build configuration
+├── README.md # This documentation
+├── include/ # Header files
+│ ├── shell.h # Main shell structures
+│ ├── parser.h # Parsing functions
+│ ├── execute.h # Execution functions
+│ ├── builtins.h # Built-in commands
+│ ├── expand.h # Variable expansion
+│ ├── path.h # PATH management
+│ ├── error.h # Error handling
+│ ├── utils.h # Utilities
+│ └── signals.h # Signal handling
+├── src/ # Source code
+│ ├── main.c # Entry point
+│ ├── shell.c # Main shell loop
+│ ├── parser.c # Command parsing
+│ ├── execute.c # Command execution
+│ ├── builtins.c # Built-in implementations
+│ ├── expand.c # Variable expansion
+│ ├── path.c # PATH resolution
+│ ├── error.c # Error handling
+│ ├── utils.c # Utility functions
+│ └── signals.c # Signal handlers
+├── man/ # Manual pages
+│ ├── exit.1
+│ ├── cd.1
+│ ├── env.1
+│ ├── setenv.1
+│ ├── unsetenv.1
+│ ├── alias.1
+│ └── path.1
+└── tests/ # Test files
+├── test_commands.txt
+├── test_batch.txt
+└── test_parser.txt
 
 
 ---
