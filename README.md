@@ -5,21 +5,6 @@
 
 ---
 
-## 📋 Table of Contents
-- [Features](#-features)
-- [Project Structure](#-project-structure)
-- [Installation & Compilation](#-installation--compilation)
-- [Usage](#-usage)
-- [Built-in Commands](#-built-in-commands)
-- [Operators](#-operators)
-- [Variable Expansion](#-variable-expansion)
-- [Error Handling](#-error-handling)
-- [Testing](#-testing)
-- [Technical Details](#-technical-details)
-- [Contributors](#-contributors)
-- [License](#-license)
-
----
 
 ## ✨ Features
 
